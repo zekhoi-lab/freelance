@@ -94,7 +94,7 @@ def scrape_all_best_sellers(start_date: str, end_date: str, delay: int = 2):
 
         for idx, future in enumerate(as_completed(futures), 1):
             week_date = futures[future]
-            logging.info(f"Scraping week {idx} of {total_weeks}: {week_date}")
+            logging.info(f"Scraped week {idx} of {total_weeks}: {week_date}")
             try:
                 week_data = future.result()
                 results.append(week_data)

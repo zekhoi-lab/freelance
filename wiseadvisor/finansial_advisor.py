@@ -66,7 +66,7 @@ def scrape_advisor_by_state_and_city(path, delay=2, retry=0) -> list:
                 href = firm_link['href']
                 links.append(href)
         
-        logging.info(f"Found {len(links)} advisor links for {path}.")
+        logging.info(f"Found {len(links)} advisor links for {HOST_NAME}{path}.")
         
         # Introduce a delay between requests
         logging.info(f"Sleeping for {delay} seconds.")
@@ -154,24 +154,33 @@ def main():
         # First, gather links for each city/state
         logging.info("Scraping advisor links for each city/state...")
         future_links = [executor.submit(scrape_advisor_by_state_and_city, city, DELAY) for city in cities]
-        future_links = [future_links[0]] # For testing with a single city
         
         # Collect all the advisor links from the futures
         advisor_links = []
-        for future in as_completed(future_links):
-            links = future.result()
-            if links:
-                advisor_links.extend(links)
+        for index, future in enumerate(as_completed(future_links), 1):
+            logging.info(f"Scraped city/state {index} of {len(cities)}...")
+            try:
+                links = future.result()
+                if links:
+                    advisor_links.extend(links) 
+                    
+            except Exception as e:
+                logging.error(f"Error scraping advisor links: {e}")
         
         # Now, scrape each advisor's details in parallel
         logging.info("Scraping advisor details...")
         future_advisors = [executor.submit(scrape_advisor, link, DELAY) for link in advisor_links]
         
         # Collect all advisor data
-        for future in as_completed(future_advisors):
-            advisor_data = future.result()
-            if advisor_data:
-                all_advisor_data.append(advisor_data)
+        for idx, future in enumerate(as_completed(future_advisors), 1):
+            logging.info(f"Scraped advisor {idx} of {len(advisor_links)}...")
+            try:
+                advisor_data = future.result()
+                if advisor_data:
+                    all_advisor_data.append(advisor_data)
+                    
+            except Exception as e:
+                logging.error(f"Error scraping advisor details: {e}")
     
     # Save the collected data to a CSV file
     date_name = datetime.now().strftime("%Y%m%d-%H%M%S")
