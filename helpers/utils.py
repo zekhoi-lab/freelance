@@ -19,7 +19,7 @@ def save_to_csv(data: List[Dict[str, str]], filename: str):
     # Open the CSV file for writing
     with open(file_path, mode='w', newline='', encoding='utf-8') as file:
         headers = list(data[0].keys()) if data else []
-        writer = csv.DictWriter(file, fieldnames=headers)
+        writer = csv.DictWriter(file, fieldnames=headers,delimiter=';')
         writer.writeheader()
 
         # Write the data to the CSV file
