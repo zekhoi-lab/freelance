@@ -136,7 +136,7 @@ def main():
     # Scrape the advisors from each state/city link in parallel
     all_advisor_data = []
     
-    with ThreadPoolExecutor(max_workers=2) as executor:
+    with ThreadPoolExecutor(max_workers=4) as executor:
         # First, gather links for each city/state
         logging.info("Scraping advisor links for each city/state...")
         future_links = [executor.submit(scrape_advisor_by_state_and_city, city, 5) for city in cities]
