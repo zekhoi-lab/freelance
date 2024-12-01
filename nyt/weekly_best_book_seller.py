@@ -4,15 +4,17 @@ from datetime import datetime, timedelta
 from typing import List, Dict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
-import csv
-import os
+import logging
+from helpers.utils import save_to_csv
+
+# Configure logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s | %(message)s')
 
 def generate_weekly_dates(start_date: str, end_date: str):
     """
     Generate a list of weekly dates between start_date and end_date, aligned to Sundays.
     The end date will be adjusted by adding 1 week.
     """
-    # Convert string dates to datetime objects
     start_date_obj = datetime.strptime(start_date, "%Y/%m/%d")
     end_date_obj = datetime.strptime(end_date, "%Y/%m/%d")
     
@@ -23,10 +25,7 @@ def generate_weekly_dates(start_date: str, end_date: str):
     days_to_previous_sunday = (start_date_obj.weekday() + 1) % 7
     start_date_obj -= timedelta(days=days_to_previous_sunday)
 
-    # List to store weekly dates (Sundays)
     weekly_dates = []
-
-    # Generate weekly dates starting from the adjusted start date
     current_date = start_date_obj
     while current_date <= end_date_obj:
         weekly_dates.append(current_date.strftime("%Y/%m/%d"))
@@ -34,12 +33,13 @@ def generate_weekly_dates(start_date: str, end_date: str):
 
     return weekly_dates
 
-def scrape_nyt_best_sellers(week_date_str: str) -> List[Dict[str, str]]:
+def scrape_nyt_best_sellers(week_date_str: str, delay: int = 2) -> List[Dict[str, str]]:
     """
     Scrape the New York Times Best Sellers list for the given week.
     """
     url = f"https://www.nytimes.com/books/best-sellers/{week_date_str}/combined-print-and-e-book-nonfiction/"
     try:
+        logging.info(f"Scraping data for week: {week_date_str}")
         response = requests.get(url)
         response.raise_for_status()  # Raise an exception for any HTTP errors
 
@@ -65,9 +65,11 @@ def scrape_nyt_best_sellers(week_date_str: str) -> List[Dict[str, str]]:
             }
             books.append(book_info)
 
+        logging.info(f"Successfully scraped {len(books)} books for week {week_date_str}.")
+        time.sleep(delay)  # Delay between requests
         return books
     except requests.RequestException as e:
-        print(f"Error fetching {url}: {e}")
+        logging.error(f"Error fetching {url}: {e}")
         return []
 
 def scrape_all_best_sellers(start_date: str, end_date: str, delay: int = 2):
@@ -75,58 +77,41 @@ def scrape_all_best_sellers(start_date: str, end_date: str, delay: int = 2):
     Scrapes the best sellers for each week in the given range of dates in parallel.
     Tracks the process and provides feedback.
     """
+    logging.info(f"Starting scraping from {start_date} to {end_date} with a delay of {delay} seconds.")
     weekly_dates = generate_weekly_dates(start_date, end_date)
 
     results = []
     total_weeks = len(weekly_dates)
     with ThreadPoolExecutor() as executor:
-        futures = {executor.submit(scrape_nyt_best_sellers, week_date): week_date for week_date in weekly_dates}
+        futures = {executor.submit(scrape_nyt_best_sellers, week_date, delay): week_date for week_date in weekly_dates}
 
         for idx, future in enumerate(as_completed(futures), 1):
             week_date = futures[future]
-            print(f"Scraping week {idx} of {total_weeks}: {week_date}")
+            logging.info(f"Scraping week {idx} of {total_weeks}: {week_date}")
             try:
                 week_data = future.result()
                 results.append(week_data)
             except Exception as e:
-                print(f"Error scraping {week_date}: {e}")
+                logging.error(f"Error scraping {week_date}: {e}")
             
-            print(f"Finished scraping week {idx}. Sleeping for {delay} seconds.")
-            time.sleep(delay)
+            logging.info(f"Finished scraping week {idx}. Sleeping for {delay} seconds.")
+            time.sleep(delay)  # Delay after processing each week
 
+    logging.info(f"Scraping completed. Collected data for {len(results)} weeks.")
     return results
 
-def save_to_csv(data: List[List[Dict[str, str]]], filename: str):
-    """
-    Saves the scraped data to a CSV file in the current directory.
-    """
-    # Get the current directory of the script
-    current_folder = os.path.dirname(os.path.abspath(__file__))
-    folder_path = os.path.join(current_folder, 'result')  # Save to 'result' folder
-
-    # Ensure the folder exists
-    os.makedirs(folder_path, exist_ok=True)
-
-    # Define the file path
-    file_path = os.path.join(folder_path, filename)
-
-    # Open the CSV file for writing
-    with open(file_path, mode='w', newline='', encoding='utf-8') as file:
-        writer = csv.DictWriter(file, fieldnames=["Date", "Book Name", "Book Author", "Book Description", "Weeks on the List/New This Week"])
-        writer.writeheader()
-
-        # Write the data to the CSV file
-        for week_data in data:
-            for book in week_data:
-                writer.writerow(book)
-
-    print(f"Data has been saved to {file_path}")
-
 # Usage
-start_date = '2019/01/01'  # Set your start date here
-end_date = '2024/12/01'    # Set your end date here
+def main():
+    start_date = '2019/01/01'  # Set your start date here
+    end_date = '2024/12/01'    # Set your end date here
 
-all_best_sellers = scrape_all_best_sellers(start_date, end_date, delay=30)
+    logging.info("Starting the scraping process.")
+    all_best_sellers = scrape_all_best_sellers(start_date, end_date, delay=30)
 
-# Save the scraped data to a CSV file
-save_to_csv(all_best_sellers, 'nyt_best_sellers.csv')
+    logging.info("Saving the scraped data to a CSV file.")
+    save_to_csv(all_best_sellers, filename='nyt_best_sellers.csv')
+
+    logging.info("Process completed successfully.")
+
+if __name__ == '__main__':
+    main()
