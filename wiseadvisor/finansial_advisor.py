@@ -1,30 +1,26 @@
 import requests
 from bs4 import BeautifulSoup
 from fake_useragent import UserAgent
-import concurrent.futures
+from concurrent.futures import ThreadPoolExecutor, as_completed
 import logging
-from typing import List, Dict
-import time  # Import time module for adding delays
+from datetime import datetime
+import time 
 from helpers.utils import save_to_csv
 
 HOST_NAME = "https://www.wiseradvisor.com"
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s | %(message)s')
-
 def scrape_advisor_from_directory() -> list:
     logging.info("Scraping city/state directory page...")
     ua = UserAgent()
     url = "https://www.wiseradvisor.com/financial-advisors.asp"
     
-    # Send an HTTP request to the webpage
-    response = requests.get(url, headers={'User-Agent': ua.random})
-    
-    # Introduce a delay between requests
-    time.sleep(2)  # Delay of 2 seconds
-    
-    # Check if the request was successful
-    if response.status_code == 200:
+    try:
+        # Send an HTTP request to the webpage
+        response = requests.get(url, headers={'User-Agent': ua.random})
+        response.raise_for_status()  # Raise HTTPError for bad responses (4xx, 5xx)
+        
         # Parse the HTML content using BeautifulSoup
         soup = BeautifulSoup(response.text, 'html.parser')
         
@@ -37,9 +33,13 @@ def scrape_advisor_from_directory() -> list:
             links.append(link.get('href'))
 
         logging.info(f"Found {len(links)} city/state links.")
+        
+        # Introduce a delay between requests
+        logging.info("Sleeping for 2 seconds.")
+        time.sleep(2)  # Delay of 2 seconds
         return links
-    else:
-        logging.error(f"Failed to retrieve the page. Status code: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Request failed: {e}")
         return None
 
 
@@ -47,15 +47,12 @@ def scrape_advisor_by_state_and_city(path, delay=2) -> list:
     ua = UserAgent()
     url = f"{HOST_NAME}{path}"
     
-    # Send an HTTP request to the webpage
-    response = requests.get(url, headers={'User-Agent': ua.random})
-    links = []
-    
-    # Introduce a delay between requests
-    time.sleep(delay)  # Delay of 2 seconds
-    
-    # Check if the request was successful
-    if response.status_code == 200:
+    try:
+        # Send an HTTP request to the webpage
+        response = requests.get(url, headers={'User-Agent': ua.random})
+        response.raise_for_status()  # Raise HTTPError for bad responses (4xx, 5xx)
+        links = []
+        
         # Parse the HTML content using BeautifulSoup
         soup = BeautifulSoup(response.text, 'html.parser')
         
@@ -64,15 +61,18 @@ def scrape_advisor_by_state_and_city(path, delay=2) -> list:
         rows = data.find_all('tr')
         for row in rows:
             firm_link = row.find('div', {'class': 'firm-advisor'}).find('a', href=True)
-            
             if firm_link:
                 href = firm_link['href']
                 links.append(href)
-                
+        
         logging.info(f"Found {len(links)} advisor links for {path}.")
+        
+        # Introduce a delay between requests
+        logging.info(f"Sleeping for {delay} seconds.")
+        time.sleep(delay)  # Delay of 2 seconds
         return links
-    else:
-        logging.error(f"Failed to retrieve the page for {path}. Status code: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Request failed for {path}: {e}")
         return None
 
 
@@ -80,14 +80,11 @@ def scrape_advisor(path, delay=2) -> dict:
     ua = UserAgent()
     url = f"{HOST_NAME}{path}"
     
-    # Send an HTTP request to the webpage
-    response = requests.get(url, headers={'User-Agent': ua.random})
-    
-    # Introduce a delay between requests
-    time.sleep(delay)  # Delay of 2 seconds
-    
-    # Check if the request was successful
-    if response.status_code == 200:
+    try:
+        # Send an HTTP request to the webpage
+        response = requests.get(url, headers={'User-Agent': ua.random})
+        response.raise_for_status()  # Raise HTTPError for bad responses (4xx, 5xx)
+        
         # Parse the HTML content using BeautifulSoup
         soup = BeautifulSoup(response.text, 'html.parser')
         
@@ -97,7 +94,7 @@ def scrape_advisor(path, delay=2) -> dict:
         
         name = detail.find('h1').text
         first_name = name.split(' ')[0].strip()
-        last_name = name.split(' ')[1]
+        last_name = ' '.join(name.split(' ')[1:]).strip()
         
         address = detail.find('div', {'style': ' margin: 10px 0px 18px'})
         address_lines = list(address.stripped_strings)
@@ -108,19 +105,25 @@ def scrape_advisor(path, delay=2) -> dict:
         state = city_state.split(',')[1].strip()
         
         info = {
-            'first': first_name,
-            'last': last_name,
-            'street': street,
-            'city': city,
-            'state': state,
-            'telephone': telephone
-            }
+            'First': first_name,
+            'Last': last_name,
+            'Street': street,
+            'City': city,
+            'State': state,
+            'Telephone': telephone
+        }
         logging.info(f"Scraped advisor: {first_name} {last_name}")
+    
+        # Introduce a delay between requests
+        logging.info(f"Sleeping for {delay} seconds.")
+        time.sleep(delay)  # Delay of 2 seconds
         return info
-    else:
-        logging.error(f"Failed to retrieve the page for {path}. Status code: {response.status_code}")
+    except requests.exceptions.RequestException as e:
+        logging.error(f"Request failed for {path}: {e}")
         return None
-
+    except Exception as e:
+        logging.error(f"Error scraping advisor details for {path}: {e}")
+        return None
 
 def main():
     # Scrape the directory for city/state links
@@ -133,30 +136,33 @@ def main():
     # Scrape the advisors from each state/city link in parallel
     all_advisor_data = []
     
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    with ThreadPoolExecutor(max_workers=2) as executor:
         # First, gather links for each city/state
         logging.info("Scraping advisor links for each city/state...")
-        future_links = [executor.submit(scrape_advisor_by_state_and_city, city) for city in cities]
+        future_links = [executor.submit(scrape_advisor_by_state_and_city, city, 5) for city in cities]
+        future_links = [future_links[0]] # For testing with a single city
         
         # Collect all the advisor links from the futures
         advisor_links = []
-        for future in concurrent.futures.as_completed(future_links):
+        for future in as_completed(future_links):
             links = future.result()
             if links:
                 advisor_links.extend(links)
         
         # Now, scrape each advisor's details in parallel
         logging.info("Scraping advisor details...")
-        future_advisors = [executor.submit(scrape_advisor, link) for link in advisor_links]
+        future_advisors = [executor.submit(scrape_advisor, link, 5) for link in advisor_links]
         
         # Collect all advisor data
-        for future in concurrent.futures.as_completed(future_advisors):
+        for future in as_completed(future_advisors):
             advisor_data = future.result()
             if advisor_data:
                 all_advisor_data.append(advisor_data)
     
     # Save the collected data to a CSV file
-    save_to_csv(all_advisor_data, filename='financial_advisors.csv')
+    date_name = datetime.now().strftime("%Y%m%d-%H%M%S")
+    filename = f'financial_advisors_{date_name}.csv'
+    save_to_csv(all_advisor_data, filename=filename)
     logging.info("Scraping completed and data saved to financial_advisors.csv.")
 
 # Usage
