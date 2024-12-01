@@ -109,7 +109,7 @@ def scrape_all_best_sellers(start_date: str, end_date: str, delay: int = 2):
 
 # Usage
 def main():
-    DELAY = 30
+    DELAY = 15
     start_date = '2019/01/01'  # Set your start date here
     end_date = '2024/12/01'    # Set your end date here
 
