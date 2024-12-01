@@ -108,11 +108,12 @@ def scrape_all_best_sellers(start_date: str, end_date: str, delay: int = 2):
 
 # Usage
 def main():
+    DELAY = 30
     start_date = '2019/01/01'  # Set your start date here
     end_date = '2024/12/01'    # Set your end date here
 
     logging.info("Starting the scraping process.")
-    all_best_sellers = scrape_all_best_sellers(start_date, end_date, delay=30)
+    all_best_sellers = scrape_all_best_sellers(start_date, end_date, delay=DELAY)
 
     logging.info("Saving the scraped data to a CSV file.")
     date_name = datetime.now().strftime("%Y%m%d-%H%M%S")

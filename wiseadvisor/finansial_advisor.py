@@ -43,7 +43,7 @@ def scrape_advisor_from_directory() -> list:
         return None
 
 
-def scrape_advisor_by_state_and_city(path, delay=2) -> list:
+def scrape_advisor_by_state_and_city(path, delay=2, retry=0) -> list:
     ua = UserAgent()
     url = f"{HOST_NAME}{path}"
     
@@ -73,10 +73,16 @@ def scrape_advisor_by_state_and_city(path, delay=2) -> list:
         return links
     except requests.exceptions.RequestException as e:
         logging.error(f"Request failed for {path}: {e}")
-        return None
+        
+        if retry < 3:
+            logging.info(f"Retrying for {path}...")
+            time.sleep(delay)
+            return scrape_advisor_by_state_and_city(path, delay, retry + 1)
+        else:
+            return None
 
 
-def scrape_advisor(path, delay=2) -> dict:
+def scrape_advisor(path, delay=2, retry=0) -> dict:
     ua = UserAgent()
     url = f"{HOST_NAME}{path}"
     
@@ -120,13 +126,20 @@ def scrape_advisor(path, delay=2) -> dict:
         return info
     except requests.exceptions.RequestException as e:
         logging.error(f"Request failed for {path}: {e}")
-        return None
+    
+        if retry < 3:
+            logging.info(f"Retrying for {path}...")
+            time.sleep(delay)
+            return scrape_advisor(path, delay, retry + 1)
+        else:
+            return None
     except Exception as e:
         logging.error(f"Error scraping advisor details for {path}: {e}")
         return None
 
 def main():
     # Scrape the directory for city/state links
+    DELAY = 10
     cities = scrape_advisor_from_directory()
     
     if not cities:
@@ -139,7 +152,7 @@ def main():
     with ThreadPoolExecutor(max_workers=4) as executor:
         # First, gather links for each city/state
         logging.info("Scraping advisor links for each city/state...")
-        future_links = [executor.submit(scrape_advisor_by_state_and_city, city, 5) for city in cities]
+        future_links = [executor.submit(scrape_advisor_by_state_and_city, city, DELAY) for city in cities]
         future_links = [future_links[0]] # For testing with a single city
         
         # Collect all the advisor links from the futures
@@ -151,7 +164,7 @@ def main():
         
         # Now, scrape each advisor's details in parallel
         logging.info("Scraping advisor details...")
-        future_advisors = [executor.submit(scrape_advisor, link, 5) for link in advisor_links]
+        future_advisors = [executor.submit(scrape_advisor, link, DELAY) for link in advisor_links]
         
         # Collect all advisor data
         for future in as_completed(future_advisors):
