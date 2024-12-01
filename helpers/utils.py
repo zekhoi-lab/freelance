@@ -2,7 +2,7 @@ import csv
 import os
 from typing import List, Dict
 
-def save_to_csv(data: List[List[Dict[str, str]]], filename: str):
+def save_to_csv(data: List[Dict[str, str]], filename: str):
     """
     Saves the scraped data to a CSV file in the current directory.
     """
@@ -18,12 +18,12 @@ def save_to_csv(data: List[List[Dict[str, str]]], filename: str):
 
     # Open the CSV file for writing
     with open(file_path, mode='w', newline='', encoding='utf-8') as file:
-        writer = csv.DictWriter(file, fieldnames=["Date", "Book Name", "Book Author", "Book Description", "Weeks on the List/New This Week"])
+        headers = list(data[0].keys()) if data else []
+        writer = csv.DictWriter(file, fieldnames=headers)
         writer.writeheader()
 
         # Write the data to the CSV file
-        for week_data in data:
-            for book in week_data:
-                writer.writerow(book)
+        for row in data:
+            writer.writerow(row)
 
     print(f"Data has been saved to {file_path}")
