@@ -57,16 +57,28 @@ def scrape_advisor_by_state_and_city(path, delay=2, retry=0) -> list:
         # Parse the HTML content using BeautifulSoup
         soup = BeautifulSoup(response.text, 'html.parser')
         
-        # Extract the advisor's name
-        data = soup.find('div', {'id': 'first-sec-data'}).find('tbody')
-        rows = data.find_all('tr')
-        for row in rows:
-            firm_link = row.find('div', {'class': 'firm-advisor'}).find('a', href=True)
-            if firm_link:
-                href = firm_link['href']
-                links.append(href)
+        title = soup.find('div', {'class': 'Advisor-Network'}).text
         
-        logging.info(f"Found {len(links)} advisor links for {HOST_NAME}{path}.")
+        if not 'qualified' in title.lower():
+            data = soup.find('div', {'id': 'first-sec-data'}).find('tbody')
+            rows = data.find_all('tr')
+        
+            for row in rows:
+                firm_link = row.find('div', {'class': 'firm-advisor'}).find('a', href=True)
+                if firm_link:
+                    href = firm_link['href']
+                    links.append(href)
+        
+        else:
+            rows = soup.find_all('div', {'class': 'client-area'})
+            
+            for row in rows:
+                firm_link = row.find('div', {'class': 'complate-profile'}).find('a', href=True)
+                if firm_link:
+                    href = firm_link['href']
+                    links.append(href)
+        
+        logging.info(f"Found {len(links)} advisor links for {url}.")
         
         # Introduce a delay between requests
         logging.info(f"Sleeping for {delay} seconds.")
@@ -81,6 +93,9 @@ def scrape_advisor_by_state_and_city(path, delay=2, retry=0) -> list:
             return scrape_advisor_by_state_and_city(path, delay, retry + 1)
         else:
             return None
+    except Exception as e:
+        logging.error(f"Error scraping advisor links for {url}: {e}")
+        
 
 
 def scrape_advisor(path, delay=2, retry=0) -> dict:
@@ -97,7 +112,11 @@ def scrape_advisor(path, delay=2, retry=0) -> dict:
         
         sections = soup.find_all('section', {'class': 'city'})
         data = sections[1]
-        detail = data.find('div', {'class': 'col-lg-8'})
+        
+        try:
+            detail = data.find('div', {'class': 'col-lg-8'})
+        except:
+            detail = data.find('div', {'class': 'col-lg-7'})
         
         name = detail.find('h1').text
         first_name = name.split(' ')[0].strip()
@@ -135,12 +154,12 @@ def scrape_advisor(path, delay=2, retry=0) -> dict:
         else:
             return None
     except Exception as e:
-        logging.error(f"Error scraping advisor details for {path}: {e}")
+        logging.error(f"Error scraping advisor details for {url}: {e}")
         return None
 
 def main():
     # Scrape the directory for city/state links
-    DELAY = 10
+    DELAY = 20
     cities = scrape_advisor_from_directory()
     
     if not cities:
