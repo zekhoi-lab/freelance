@@ -5,6 +5,7 @@ from typing import List, Dict
 from concurrent.futures import ThreadPoolExecutor, as_completed
 import time
 import logging
+from itertools import chain
 from helpers.utils import save_to_csv
 
 # Configure logging
@@ -33,7 +34,7 @@ def generate_weekly_dates(start_date: str, end_date: str):
 
     return weekly_dates
 
-def scrape_nyt_best_sellers(week_date_str: str, delay: int = 2) -> List[Dict[str, str]]:
+def scrape_nyt_best_sellers(week_date_str: str, delay: int = 2, retry=0) -> List[Dict[str, str]]:
     """
     Scrape the New York Times Best Sellers list for the given week.
     """
@@ -65,12 +66,17 @@ def scrape_nyt_best_sellers(week_date_str: str, delay: int = 2) -> List[Dict[str
             }
             books.append(book_info)
 
-        logging.info(f"Successfully scraped {len(books)} books for week {week_date_str}.")
+        logging.info(f"Successfully scraped {len(books)} books for week {week_date_str}. Sleeping for {delay} seconds.")
         time.sleep(delay)  # Delay between requests
         return books
     except requests.RequestException as e:
-        logging.error(f"Error fetching {url}: {e}")
-        return []
+        logging.error(f"Failed to scrape data for week {week_date_str}: {e}")
+        if retry < 3:
+            logging.info(f"Retrying for week {week_date_str}...")
+            time.sleep(delay)
+            return scrape_nyt_best_sellers(week_date_str, delay, retry + 1)
+        else:
+            return []
 
 def scrape_all_best_sellers(start_date: str, end_date: str, delay: int = 2):
     """
@@ -82,7 +88,7 @@ def scrape_all_best_sellers(start_date: str, end_date: str, delay: int = 2):
 
     results = []
     total_weeks = len(weekly_dates)
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=2) as executor:
         futures = {executor.submit(scrape_nyt_best_sellers, week_date, delay): week_date for week_date in weekly_dates}
 
         for idx, future in enumerate(as_completed(futures), 1):
@@ -109,7 +115,10 @@ def main():
     all_best_sellers = scrape_all_best_sellers(start_date, end_date, delay=30)
 
     logging.info("Saving the scraped data to a CSV file.")
-    save_to_csv(all_best_sellers, filename='nyt_best_sellers.csv')
+    date_name = datetime.now().strftime("%Y%m%d-%H%M%S")
+    filename = f'nyt_best_sellers_{date_name}.csv'
+    data = list(chain.from_iterable(all_best_sellers))  # Flatten the list of lists
+    save_to_csv(data, filename=filename)
 
     logging.info("Process completed successfully.")
 
