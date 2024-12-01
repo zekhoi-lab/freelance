@@ -89,7 +89,7 @@ def scrape_advisor_by_state_and_city(path, delay=2, retry=0) -> list:
         
         if retry < 3:
             logging.info(f"Retrying for {path}...")
-            time.sleep(delay)
+            time.sleep(delay * 1.5)
             return scrape_advisor_by_state_and_city(path, delay, retry + 1)
         else:
             return None
@@ -149,7 +149,7 @@ def scrape_advisor(path, delay=2, retry=0) -> dict:
     
         if retry < 3:
             logging.info(f"Retrying for {path}...")
-            time.sleep(delay)
+            time.sleep(delay * 1.5)
             return scrape_advisor(path, delay, retry + 1)
         else:
             return None

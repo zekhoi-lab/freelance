@@ -74,7 +74,7 @@ def scrape_nyt_best_sellers(week_date_str: str, delay: int = 2, retry=0) -> List
         logging.error(f"Failed to scrape data for week {week_date_str}: {e}")
         if retry < 3:
             logging.info(f"Retrying for week {week_date_str}...")
-            time.sleep(delay)
+            time.sleep(delay * 1.5)
             return scrape_nyt_best_sellers(week_date_str, delay, retry + 1)
         else:
             return []
