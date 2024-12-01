@@ -7,6 +7,7 @@ import time
 import logging
 from itertools import chain
 from helpers.utils import save_to_csv
+from helpers.config import MAX_WORKERS
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s | %(message)s')
@@ -88,7 +89,7 @@ def scrape_all_best_sellers(start_date: str, end_date: str, delay: int = 2):
 
     results = []
     total_weeks = len(weekly_dates)
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = {executor.submit(scrape_nyt_best_sellers, week_date, delay): week_date for week_date in weekly_dates}
 
         for idx, future in enumerate(as_completed(futures), 1):

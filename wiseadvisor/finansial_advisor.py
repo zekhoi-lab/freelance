@@ -6,6 +6,7 @@ import logging
 from datetime import datetime
 import time 
 from helpers.utils import save_to_csv
+from helpers.config import MAX_WORKERS
 
 HOST_NAME = "https://www.wiseradvisor.com"
 
@@ -149,7 +150,7 @@ def main():
     # Scrape the advisors from each state/city link in parallel
     all_advisor_data = []
     
-    with ThreadPoolExecutor(max_workers=4) as executor:
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         # First, gather links for each city/state
         logging.info("Scraping advisor links for each city/state...")
         future_links = [executor.submit(scrape_advisor_by_state_and_city, city, DELAY) for city in cities]
