@@ -113,9 +113,8 @@ def scrape_advisor(path, delay=2, retry=0) -> dict:
         sections = soup.find_all('section', {'class': 'city'})
         data = sections[1]
         
-        try:
-            detail = data.find('div', {'class': 'col-lg-8'})
-        except:
+        detail = data.find('div', {'class': 'col-lg-8'})
+        if not detail:
             detail = data.find('div', {'class': 'col-lg-7'})
         
         name = detail.find('h1').text
@@ -123,6 +122,9 @@ def scrape_advisor(path, delay=2, retry=0) -> dict:
         last_name = ' '.join(name.split(' ')[1:]).strip()
         
         address = detail.find('div', {'style': ' margin: 10px 0px 18px'})
+        if not address:
+            address = detail.find('div', {'style': ' margin: 20px 0 20px 0'})
+        
         address_lines = list(address.stripped_strings)
         street = ', '.join(address_lines[1:3])  # Skip the phone number at index 0
         telephone = address.find('div').text.replace('Tel:', '').strip()
